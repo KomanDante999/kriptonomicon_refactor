@@ -212,6 +212,9 @@
 //? 10. магические строки и числа (URL, таймеры, ключи, количество элементов на странице, методы валидации, отбора и фильтрации ) (критичность 2)
 //?[v] 11. график не работает, если значения не изменяются
 //?[v] 12. при удалении тикера он остается выбранным
+
+import { loadTicker } from "@/api";
+
 export default {
   name: "App",
   data() {
@@ -277,15 +280,13 @@ export default {
     },
     subscribeToUpdates(tickerName) {
       setInterval(async () => {
-        const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=${this.API_KEY}`
-        );
-        const data = await f.json();
-        this.tickers.find((t) => t.name === tickerName).price = data.USD;
-        //  > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+        const exchangeData = await loadTicker(tickerName);
+        this.tickers.find((t) => t.name === tickerName).price =
+          exchangeData.USD;
+        //  > 1 ? exchangeData.USD.toFixed(2) : exchangeData.USD.toPrecision(2);
         if (this.selectedTiker?.name === tickerName) {
-          this.graf.push(data.USD);
-          console.log(data.USD);
+          this.graf.push(exchangeData.USD);
+          console.log(exchangeData.USD);
         }
       }, 3000);
     },
@@ -389,6 +390,15 @@ export default {
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
     );
+
+    // const VALID_KEYS = ["filter", "page"];
+    // VALID_KEYS.forEach((key) => {
+    //   if (windowData[key]) {
+    //     this[key] = windowData[key];
+    //   }
+    // });
+    // Object.assign(this, _.pick(windowData, VALID_KEYS));
+
     if (windowData.filter) {
       this.filter = windowData.filter;
     }
