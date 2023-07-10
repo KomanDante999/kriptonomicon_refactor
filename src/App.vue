@@ -96,7 +96,7 @@
             </div>
           </div>
           <button
-            @click="page = page - 1"
+            @click="page -= 1"
             :class="{ 'pointer-events-none': !(page > 1) }"
             :disabled="!(page > 1)"
             class="disabled:opacity-50 my-4 mr-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
@@ -105,7 +105,7 @@
           </button>
           <span class="mr-4"> {{ page }} </span>
           <button
-            @click="page = page + 1"
+            @click="page += 1"
             :class="{ 'pointer-events-none': !hasNexPage }"
             :disabled="!hasNexPage"
             class="disabled:opacity-50 my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
@@ -116,11 +116,11 @@
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in filteredTickers()"
+            v-for="t in paginatedTickers"
             @click="selection(t)"
             :key="t.name"
             :class="{
-              'border-4': sel === t,
+              'border-4': selectedTiker === t,
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
@@ -154,20 +154,20 @@
           </div>
         </dl>
         <hr class="w-full border-t border-gray-600 my-4" />
-        <section v-if="sel" class="relative">
+        <section v-if="selectedTiker" class="relative">
           <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-            {{ sel.name }} - USD
+            {{ selectedTiker.name }} - USD
           </h3>
           <div class="flex items-end border-gray-600 border-b border-l h-64">
             <div
-              v-for="(bar, index) in normalizeGraf()"
+              v-for="(bar, index) in normalizedGraf"
               :style="{ height: `${bar}%` }"
               :key="index"
               class="bg-purple-800 border w-10"
             ></div>
           </div>
           <button
-            @click="sel = null"
+            @click="selectedTiker = null"
             type="button"
             class="absolute top-0 right-0"
           >
@@ -200,16 +200,18 @@
 </template>
 
 <script>
-//? 1. наличие в состоянии ЗАВИСИМЫХ ДАННЫХ (критичность 6+)
+//?[v] 1. наличие в состоянии ЗАВИСИМЫХ ДАННЫХ (критичность 6+)
 //? 2. при удалении остается подписка за обновление тикеров (критичность 5)
 //? 3. отсутсвует обработка ошибок API (критичность 5)
 //? 4. большое количество запросов (критичность 4)
 //? 5. запросы напрямую внутри компонента (критичность 4)
-//? 6. при удалении тикера не обновляется localStorage (критичность 4)
-//? 7. одинаковый код в watch (критичность 3)
+//?[v] 6. при удалении тикера не обновляется localStorage (критичность 4)
+//?[v] 7. одинаковый код в watch (критичность 3)
 //? 8. localStorage и анонимные вкладки (может быть недоступен) (критичность 3)
 //? 9. график плохо выглядит если будет много цен (критичность 2)
 //? 10. магические строки и числа (URL, таймеры, ключи, количество элементов на странице, методы валидации, отбора и фильтрации ) (критичность 2)
+//?[v] 11. график не работает, если значения не изменяются
+//?[v] 12. при удалении тикера он остается выбранным
 export default {
   name: "App",
   data() {
@@ -217,9 +219,8 @@ export default {
       ticker: "",
       filter: "",
       tickers: [],
-      sel: null,
+      selectedTiker: null,
       graf: [],
-      hasNexPage: true,
       page: 1,
 
       listAvailableCoins: [],
@@ -230,6 +231,39 @@ export default {
         "c5830f5e427fa14670e0d35f1fd17a70a42551bac738247d2bb81ed27a20b5ae",
     };
   },
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 6;
+    },
+    endIndex() {
+      return this.page * 6;
+    },
+    filteredTickers() {
+      return this.tickers.filter((t) => t.name.includes(this.filter));
+    },
+    paginatedTickers() {
+      return this.filteredTickers.slice(this.startIndex, this.endIndex);
+    },
+    hasNexPage() {
+      return this.filteredTickers.length > this.endIndex;
+    },
+    normalizedGraf() {
+      const minValue = Math.min(...this.graf);
+      const maxValue = Math.max(...this.graf);
+      if (minValue === maxValue) {
+        return this.graf.map(() => 5);
+      }
+      return this.graf.map(
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
+    },
+  },
   methods: {
     add() {
       const currentTicker = {
@@ -237,10 +271,8 @@ export default {
         price: "- -",
       };
       this.filter = "";
-      this.tickers.push(currentTicker);
+      this.tickers = [...this.tickers, currentTicker];
       this.ticker = "";
-
-      localStorage.setItem("kriptonomicon-list", JSON.stringify(this.tickers));
       this.subscribeToUpdates(currentTicker.name);
     },
     subscribeToUpdates(tickerName) {
@@ -251,7 +283,7 @@ export default {
         const data = await f.json();
         this.tickers.find((t) => t.name === tickerName).price = data.USD;
         //  > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-        if (this.sel?.name === tickerName) {
+        if (this.selectedTiker?.name === tickerName) {
           this.graf.push(data.USD);
           console.log(data.USD);
         }
@@ -268,17 +300,12 @@ export default {
     },
     handleDelete(tikerToRemove) {
       this.tickers = this.tickers.filter((t) => t !== tikerToRemove);
-    },
-    normalizeGraf() {
-      const minValue = Math.min(...this.graf);
-      const maxValue = Math.max(...this.graf);
-      return this.graf.map(
-        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      );
+      if (this.selectedTiker === tikerToRemove) {
+        this.selectedTiker = null;
+      }
     },
     selection(ticker) {
-      this.sel = ticker;
-      this.graf = [];
+      this.selectedTiker = ticker;
     },
     loadAvailableCoins() {
       setTimeout(async () => {
@@ -323,17 +350,6 @@ export default {
         this.validMessage = "Такой тикер не существует";
       }
     },
-    filteredTickers() {
-      const start = (this.page - 1) * 6;
-      const end = this.page * 6;
-      this.filter = this.filter.toLocaleUpperCase();
-
-      const filteredTickers = this.tickers.filter((t) =>
-        t.name.includes(this.filter)
-      );
-      this.hasNexPage = filteredTickers.length > end;
-      return filteredTickers.slice(start, end);
-    },
   },
   watch: {
     ticker() {
@@ -342,19 +358,31 @@ export default {
     },
     filter() {
       this.page = 1;
-      // const { protocol, host, pathname } = window.location;
+    },
+    pageStateOptions(value) {
       window.history.pushState(
         null,
         document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+        `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       );
     },
-    page() {
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page -= 1;
+      }
+    },
+    tickers(newValue, oldValue) {
+      //? почему не обновляется при добавлении тикера?
+      console.log(
+        "watch tickers newValue, oldValue",
+        newValue.length,
+        oldValue.length
       );
+      console.log("watch tickers newValue === oldValue", newValue === oldValue);
+      localStorage.setItem("kriptonomicon-list", JSON.stringify(this.tickers));
+    },
+    selectedTiker() {
+      this.graf = [];
     },
   },
   created() {
