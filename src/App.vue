@@ -276,19 +276,16 @@ export default {
       this.filter = "";
       this.tickers = [...this.tickers, currentTicker];
       this.ticker = "";
-      this.subscribeToUpdates(currentTicker.name);
     },
-    subscribeToUpdates(tickerName) {
-      setInterval(async () => {
-        const exchangeData = await loadTicker(tickerName);
-        this.tickers.find((t) => t.name === tickerName).price =
-          exchangeData.USD;
-        //  > 1 ? exchangeData.USD.toFixed(2) : exchangeData.USD.toPrecision(2);
-        if (this.selectedTiker?.name === tickerName) {
-          this.graf.push(exchangeData.USD);
-          console.log(exchangeData.USD);
-        }
-      }, 3000);
+    async updateTickers() {
+      if (!this.tickers.length) {
+        return;
+      }
+      const exchangeData = await loadTicker(this.tickers.map((t) => t.name));
+      this.tickers.forEach((t) => {
+        const price = exchangeData[t.name.toUpperCase()];
+        t.price = price ? 1 / price : "- oo -";
+      });
     },
     addCoin() {
       this.validationEmpty();
@@ -408,12 +405,12 @@ export default {
 
     this.loadAvailableCoins();
     const tickersData = localStorage.getItem("kriptonomicon-list");
+
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
-      this.tickers.forEach((t) => {
-        this.subscribeToUpdates(t.name);
-      });
     }
+
+    setInterval(this.updateTickers, 5000);
   },
 };
 </script>
