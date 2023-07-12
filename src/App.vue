@@ -231,7 +231,7 @@ export default {
       valid: true,
       validMessage: "",
       API_KEY:
-        "c5830f5e427fa14670e0d35f1fd17a70a42551bac738247d2bb81ed27a20b5ae",
+        "dae990cd86a8f11db58c1065e67360ce01a32d7c62a25cc227833e4fbf6a9978",
     };
   },
   computed: {
@@ -282,9 +282,9 @@ export default {
         return;
       }
       const exchangeData = await loadTicker(this.tickers.map((t) => t.name));
-      this.tickers.forEach((t) => {
-        const price = exchangeData[t.name.toUpperCase()];
-        t.price = price ? 1 / price : "- oo -";
+      this.tickers.forEach((ticker) => {
+        const price = exchangeData[ticker.name.toUpperCase()];
+        ticker.price = price ? 1 / price : "- -";
       });
     },
     addCoin() {
