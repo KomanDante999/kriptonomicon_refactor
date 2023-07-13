@@ -213,7 +213,7 @@
 //?[v] 11. график не работает, если значения не изменяются
 //?[v] 12. при удалении тикера он остается выбранным
 
-import { loadTickers } from "@/api";
+import { loadTickersMultiple, subscribeToTicker } from "@/api";
 
 export default {
   name: "App",
@@ -276,15 +276,18 @@ export default {
       this.filter = "";
       this.tickers = [...this.tickers, currentTicker];
       this.ticker = "";
+      subscribeToTicker(this.ticker.name, () => {});
     },
     async updateTickers() {
       if (!this.tickers.length) {
         return;
       }
-      const exchangeData = await loadTickers(this.tickers.map((t) => t.name));
+      const exchangeData = await loadTickersMultiple(
+        this.tickers.map((t) => t.name)
+      );
       this.tickers.forEach((ticker) => {
         const price = exchangeData[ticker.name.toUpperCase()];
-        console.log("price :>> ", price);
+        // console.log("price :>> ", price);
         ticker.price = price ?? "";
       });
     },
@@ -408,6 +411,9 @@ export default {
 
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
+      this.tickers.forEach((t) => {
+        subscribeToTicker(t.name, () => {});
+      });
     }
 
     setInterval(this.updateTickers, 5000);
