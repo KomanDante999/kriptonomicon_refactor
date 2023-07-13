@@ -129,7 +129,7 @@
                 {{ t.name }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ t.price }}
+                {{ formatedPrice(t.price) }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
@@ -213,7 +213,7 @@
 //?[v] 11. график не работает, если значения не изменяются
 //?[v] 12. при удалении тикера он остается выбранным
 
-import { loadTicker } from "@/api";
+import { loadTickers } from "@/api";
 
 export default {
   name: "App",
@@ -281,11 +281,18 @@ export default {
       if (!this.tickers.length) {
         return;
       }
-      const exchangeData = await loadTicker(this.tickers.map((t) => t.name));
+      const exchangeData = await loadTickers(this.tickers.map((t) => t.name));
       this.tickers.forEach((ticker) => {
         const price = exchangeData[ticker.name.toUpperCase()];
-        ticker.price = price ? 1 / price : "- -";
+        console.log("price :>> ", price);
+        ticker.price = price ?? "";
       });
+    },
+    formatedPrice(price) {
+      if (!Number.isFinite(price)) {
+        return "- -";
+      }
+      return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
     addCoin() {
       this.validationEmpty();
@@ -369,14 +376,7 @@ export default {
         this.page -= 1;
       }
     },
-    tickers(newValue, oldValue) {
-      //? почему не обновляется при добавлении тикера?
-      console.log(
-        "watch tickers newValue, oldValue",
-        newValue.length,
-        oldValue.length
-      );
-      console.log("watch tickers newValue === oldValue", newValue === oldValue);
+    tickers() {
       localStorage.setItem("kriptonomicon-list", JSON.stringify(this.tickers));
     },
     selectedTiker() {
